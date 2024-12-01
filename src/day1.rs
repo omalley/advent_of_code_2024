@@ -1,16 +1,20 @@
 use std::collections::HashMap;
 use std::iter::zip;
 use itertools::Itertools;
+use smallvec::SmallVec;
 
 fn parse_int(s: &str) -> Result<i32, String> {
   s.parse().map_err(|_| format!("Can't parse integer - '{s}'"))
 }
+
+fn parse_line(s: &str) -> Result<(i32,i32), String> {
+  let words: SmallVec<[i32; 2]> = s.split_whitespace().map(parse_int).try_collect()?;
+  if words.len() != 2 {return Err(format!("Line is wrong length - {s}"))}
+  Ok((words[0], words[1]))
+}
+
 pub fn generator(input: &str) -> Vec<(i32,i32)> {
-  input.lines().map(|l| l.split_whitespace().map(parse_int)
-      .collect::<Result<Vec<i32>,String>>())
-      .map_ok(|v| (v[0], v[1]))
-      .collect::<Result<Vec<(i32,i32)>,String>>()
-      .expect("Can't parse input")
+  input.lines().map(parse_line).try_collect().expect("Can't parse input")
 }
 
 pub fn part1(input: &[(i32,i32)]) -> i32 {
