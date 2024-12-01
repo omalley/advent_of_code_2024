@@ -5,23 +5,23 @@ use itertools::Itertools;
 fn parse_int(s: &str) -> Result<i32, String> {
   s.parse().map_err(|_| format!("Can't parse integer - '{s}'"))
 }
-pub fn generator(input: &str) -> Vec<Vec<i32>> {
+pub fn generator(input: &str) -> Vec<(i32,i32)> {
   input.lines().map(|l| l.split_whitespace().map(parse_int)
-      .collect::<Result<Vec<i32>,String>>()).collect::<Result<Vec<Vec<i32>>,String>>()
+      .collect::<Result<Vec<i32>,String>>())
+      .map_ok(|v| (v[0], v[1]))
+      .collect::<Result<Vec<(i32,i32)>,String>>()
       .expect("Can't parse input")
 }
 
-pub fn part1(input: &[Vec<i32>]) -> i32 {
-  let mut left: Vec<i32> = input.iter().map(|p| p[0]).collect();
+pub fn part1(input: &[(i32,i32)]) -> i32 {
+  let (mut left, mut right): (Vec<i32>, Vec<i32>) = input.iter().copied().unzip();
   left.sort_unstable();
-  let mut right: Vec<i32> = input.iter().map(|p| p[1]).collect();
   right.sort_unstable();
   zip(left,right).map(|(l,r)| (l-r).abs()).sum()
 }
 
-pub fn part2(input: &[Vec<i32>]) -> i32 {
-  let left: Vec<i32> = input.iter().map(|p| p[0]).collect();
-  let mut right: Vec<i32> = input.iter().map(|p| p[1]).collect();
+pub fn part2(input: &[(i32,i32)]) -> i32 {
+  let (left, mut right): (Vec<i32>, Vec<i32>) = input.iter().copied().unzip();
   right.sort_unstable();
   let counts: HashMap<i32, usize> = right.into_iter().dedup_with_count()
       .map(|(c,e)| (e, c)).collect();
