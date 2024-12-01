@@ -1,51 +1,32 @@
-pub fn generator(input: &str) -> Vec<String> {
-  input.lines().map(|l| l.to_string()).collect()
+use std::collections::HashMap;
+use std::iter::zip;
+use itertools::Itertools;
+
+fn parse_int(s: &str) -> Result<i32, String> {
+  s.parse().map_err(|_| format!("Can't parse integer - '{s}'"))
+}
+pub fn generator(input: &str) -> Vec<Vec<i32>> {
+  input.lines().map(|l| l.split_whitespace().map(parse_int)
+      .collect::<Result<Vec<i32>,String>>()).collect::<Result<Vec<Vec<i32>>,String>>()
+      .expect("Can't parse input")
 }
 
-/// Add each line as first and last digit
-pub fn part1(input: &[String]) -> i32 {
-  input.iter()
-    .map(|v| {
-      let first = v.chars().find(|c| c.is_ascii_digit()).unwrap();
-      let second = v.chars().rev().find(|c| c.is_ascii_digit()).unwrap();
-      (first as i32 - '0' as i32) * 10 + (second as i32 - '0' as i32)})
-    .sum()
+pub fn part1(input: &[Vec<i32>]) -> i32 {
+  let mut left: Vec<i32> = input.iter().map(|p| p[0]).collect();
+  left.sort_unstable();
+  let mut right: Vec<i32> = input.iter().map(|p| p[1]).collect();
+  right.sort_unstable();
+  zip(left,right).map(|(l,r)| (l-r).abs()).sum()
 }
 
-/// Does the given string start with a digit (numeric or name)? If so, return its value.
-fn digit(str: &str) -> Option<i32> {
-  match str.chars().next() {
-    Some('o') => if str.starts_with("one") { return Some(1) },
-    Some('t') => if str.starts_with("two") { return Some(2) }
-      else if str.starts_with("three") { return Some(3) },
-    Some('f') => if str.starts_with("four") { return Some(4) }
-      else if str.starts_with("five") { return Some(5) },
-    Some('s') => if str.starts_with("six") { return Some(6) }
-      else if str.starts_with("seven") { return Some(7) },
-    Some('e') => if str.starts_with("eight") { return Some(8) },
-    Some('n') => if str.starts_with("nine") { return Some(9) },
-    Some(ch) => if ch.is_ascii_digit() { return Some(ch as i32 - '0' as i32)},
-    _ => {},
-  }
-  None
-}
-
-/// Find the first or last digit in the string, depending on the passed in iterator.
-fn find_digit(s: &str, itr: &mut dyn Iterator<Item=usize>) -> i32 {
-  for i in itr {
-    if let Some(d) = digit(&s[i..]) {
-      return d
-    }
-  }
-  0
-}
-
-/// Include the word replacements for the digits.
-pub fn part2(input: &[String]) -> i32 {
-  input.iter().map(|l| {
-      find_digit(l, &mut (0..l.len())) * 10 +
-        find_digit(l, &mut (0..l.len()).rev())})
-    .sum()
+pub fn part2(input: &[Vec<i32>]) -> i32 {
+  let left: Vec<i32> = input.iter().map(|p| p[0]).collect();
+  let mut right: Vec<i32> = input.iter().map(|p| p[1]).collect();
+  right.sort_unstable();
+  let counts: HashMap<i32, usize> = right.into_iter().dedup_with_count()
+      .map(|(c,e)| (e, c)).collect();
+  left.iter().filter_map(|l| counts.get(l).map(|r| l * *r as i32))
+      .sum()
 }
 
 #[cfg(test)]
@@ -53,29 +34,22 @@ mod tests {
   use crate::day1::{generator, part1, part2};
 
   const INPUT: &str =
-"1abc2
-pqr3stu8vwx
-a1b2c3d4e5f
-treb7uchet";
+"3   4
+4   3
+2   5
+1   3
+3   9
+3   3";
 
   #[test]
   fn test_part1() {
-    assert_eq!(142, part1(&generator(INPUT)));
+    let data = generator(INPUT);
+    assert_eq!(11, part1(&data));
   }
-
-  const INPUT2: &str =
-"two1nine
-eightwothree
-abcone2threexyz
-xtwone3four
-4nineeightseven2
-zoneight234
-7pqrstsixteen";
 
   #[test]
   fn test_part2() {
-    assert_eq!(142, part2(&generator(INPUT)));
-    assert_eq!(281, part2(&generator(INPUT2)));
-    assert_eq!(21, part2(&generator("twone")));
+    let data = generator(INPUT);
+    assert_eq!(31, part2(&data));
   }
 }
