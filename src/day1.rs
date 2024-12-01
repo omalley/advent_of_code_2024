@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::iter::zip;
 use itertools::Itertools;
 use smallvec::SmallVec;
@@ -27,10 +26,14 @@ pub fn part1(input: &[(i32,i32)]) -> i32 {
 pub fn part2(input: &[(i32,i32)]) -> i32 {
   let (left, mut right): (Vec<i32>, Vec<i32>) = input.iter().copied().unzip();
   right.sort_unstable();
-  let counts: HashMap<i32, usize> = right.into_iter().dedup_with_count()
+  let counts: Vec<(i32, usize)> = right.into_iter().dedup_with_count()
       .map(|(c,e)| (e, c)).collect();
-  left.iter().filter_map(|l| counts.get(l).map(|r| l * *r as i32))
-      .sum()
+  // Go through the left and match it with the count on the right.
+  left.iter().map(|l|
+      match counts.binary_search_by(|probe| probe.0.cmp(&l)) {
+        Ok(i) => *l * (counts[i].1 as i32),
+        _ => 0,
+      }).sum()
 }
 
 #[cfg(test)]
