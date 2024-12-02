@@ -53,12 +53,7 @@ fn is_good_with_drop(row: &Row, drop: usize) -> bool {
 /// Is this row ok given that we drop one element?
 fn is_ok(row: &Row) -> bool {
   // try each position to drop and if we find one, accept the Row.
-  for drop in 0..row.len() {
-    if is_good_with_drop(row, drop) {
-      return true
-    }
-  }
-  false
+  (0..row.len()).any(|drop| is_good_with_drop(row, drop))
 }
 
 pub fn part1(input: &[Row]) -> usize {
