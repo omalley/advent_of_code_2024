@@ -30,7 +30,7 @@ pub fn part2(input: &[(i32,i32)]) -> i32 {
       .map(|(c,e)| (e, c)).collect();
   // Go through the left and match it with the count on the right.
   left.iter().map(|l|
-      match counts.binary_search_by(|probe| probe.0.cmp(&l)) {
+      match counts.binary_search_by(|probe| probe.0.cmp(l)) {
         Ok(i) => *l * (counts[i].1 as i32),
         _ => 0,
       }).sum()
