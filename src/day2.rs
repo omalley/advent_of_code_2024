@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::ops::RangeInclusive;
 use itertools::Itertools;
 use smallvec::SmallVec;
 
@@ -16,61 +16,42 @@ pub fn generator(input: &str) -> Vec<Row> {
   input.lines().map(parse_line).try_collect().expect("Can't parse input")
 }
 
+const VALID: RangeInclusive<i32> = 1..=3;
+
 fn is_good(row: &Row) -> bool {
   if row.len() <= 1 {
     true
   } else if row[1] > row[0] {
-    row.iter().tuple_windows().all(|(a, b)| (1..=3).contains(&(*b - *a)))
+    row.iter().tuple_windows().all(|(a, b)| VALID.contains(&(*b - *a)))
   } else {
-    row.iter().tuple_windows().all(|(a, b)| (1..=3).contains(&(*a - *b)))
+    row.iter().tuple_windows().all(|(a, b)| VALID.contains(&(*a - *b)))
   }
 }
 
-#[derive(Clone,Debug,Eq,PartialEq)]
-enum DeltaKind {
-  Gain,
-  Loss,
-  Bad,
-}
-
-fn analyze_delta(x: i32) -> DeltaKind {
-  match x {
-    1..=3 => DeltaKind::Gain,
-    -3..=-1 => DeltaKind::Loss,
-    _ => DeltaKind::Bad,
+fn is_good_with_drop(row: &Row, drop: usize) -> bool {
+  if row.len() <= 2 {
+    true
+  } else {
+    let p0 = if drop == 0 { 1 } else { 0 };
+    let p1 = if drop <= 1 { 2 } else { 1 };
+    let check = if row[p1] > row[p0] {
+      |(a, b) : (&i32, &i32) | VALID.contains(&(*b - *a))
+    } else {
+      |(a, b) : (&i32, &i32) | VALID.contains(&(*a - *b))
+    };
+    row.iter().enumerate()
+        .filter_map(|(i, v)| if i == drop { None } else { Some(v) } )
+        .tuple_windows().all(check)
   }
-}
-
-fn analyze_diffs(x: &[i32]) -> Option<DeltaKind> {
-  x.iter().fold(None, |acc, v| match acc {
-    Some(DeltaKind::Bad) => acc,
-    Some(prev) =>
-      if prev == analyze_delta(*v) { Some(prev) } else { Some(DeltaKind::Bad) },
-    None => Some(analyze_delta(*v)),
-  })
 }
 
 fn is_ok(row: &Row) -> bool {
-  if row.len() <= 1 {
-    true
-  } else {
-    // compute the deltas between
-    let diffs: Vec<i32> = row.iter().tuple_windows().map(|(a, b)| *b - *a).collect();
-    if analyze_diffs(&diffs[1..]) != Some(DeltaKind::Bad) { return true }
-    if analyze_diffs(&diffs[..diffs.len()-1]) != Some(DeltaKind::Bad) { return true }
-    for i in 0..diffs.len() {
-      let mut copy = Vec::with_capacity(diffs.len() - 1);
-      for j in 0..diffs.len()-1 {
-        match j.cmp(&i) {
-          Ordering::Less => { copy.push(diffs[j]) }
-          Ordering::Equal => { copy.push(diffs[j] + diffs[j+1]) }
-          Ordering::Greater => { copy.push(diffs[j + 1])}
-        }
-      }
-      if analyze_diffs(&copy) != Some(DeltaKind::Bad) { return true }
+  for drop in 0..row.len() {
+    if is_good_with_drop(&row, drop) {
+      return true
     }
-    false
   }
+  false
 }
 
 pub fn part1(input: &[Row]) -> usize {
