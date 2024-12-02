@@ -56,7 +56,8 @@ fn is_ok(row: &Row) -> bool {
   } else {
     // compute the deltas between
     let diffs: Vec<i32> = row.iter().tuple_windows().map(|(a, b)| *b - *a).collect();
-    if analyze_diffs(&diffs) != Some(DeltaKind::Bad) { return true }
+    if analyze_diffs(&diffs[1..]) != Some(DeltaKind::Bad) { return true }
+    if analyze_diffs(&diffs[..diffs.len()-1]) != Some(DeltaKind::Bad) { return true }
     for i in 0..diffs.len() {
       let mut copy = Vec::with_capacity(diffs.len() - 1);
       for j in 0..diffs.len()-1 {
@@ -68,18 +69,16 @@ fn is_ok(row: &Row) -> bool {
       }
       if analyze_diffs(&copy) != Some(DeltaKind::Bad) { return true }
     }
-    if analyze_diffs(&diffs[1..]) != Some(DeltaKind::Bad) { return true }
-    if analyze_diffs(&diffs[..diffs.len()-1]) != Some(DeltaKind::Bad) { return true }
-    return false
+    false
   }
 }
 
 pub fn part1(input: &[Row]) -> usize {
-  input.iter().filter(|v| is_good(*v)).count()
+  input.iter().filter(|v| is_good(v)).count()
 }
 
 pub fn part2(input: &[Row]) -> usize {
-  input.iter().filter(|v| is_ok(*v)).count()
+  input.iter().filter(|v| is_ok(v)).count()
 }
 
 #[cfg(test)]
