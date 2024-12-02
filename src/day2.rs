@@ -54,7 +54,7 @@ fn is_good_with_drop(row: &Row, drop: usize) -> bool {
 fn is_ok(row: &Row) -> bool {
   // try each position to drop and if we find one, accept the Row.
   for drop in 0..row.len() {
-    if is_good_with_drop(&row, drop) {
+    if is_good_with_drop(row, drop) {
       return true
     }
   }
@@ -71,7 +71,7 @@ pub fn part2(input: &[Row]) -> usize {
 
 #[cfg(test)]
 mod tests {
-  use crate::day2::{generator, part1, part2};
+  use super::{generator, part1, part2};
 
   const INPUT: &str =
 "7 6 4 2 1

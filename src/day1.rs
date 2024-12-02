@@ -38,7 +38,7 @@ pub fn part2(input: &[(i32,i32)]) -> i32 {
 
 #[cfg(test)]
 mod tests {
-  use crate::day1::{generator, part1, part2};
+  use super::{generator, part1, part2};
 
   const INPUT: &str =
 "3   4
