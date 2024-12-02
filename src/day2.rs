@@ -28,24 +28,31 @@ fn is_good(row: &Row) -> bool {
   }
 }
 
+/// Is the row ok given that we drop the element at the given position?
 fn is_good_with_drop(row: &Row, drop: usize) -> bool {
+  // All rows with size 2 or less are valid if we drop one of them.
   if row.len() <= 2 {
     true
   } else {
+    // Figure out the first two elements that we are keeping.
     let p0 = if drop == 0 { 1 } else { 0 };
     let p1 = if drop <= 1 { 2 } else { 1 };
+    // Figure out the correct compare function for either growing or shrinking.
     let check = if row[p1] > row[p0] {
       |(a, b) : (&i32, &i32) | VALID.contains(&(*b - *a))
     } else {
       |(a, b) : (&i32, &i32) | VALID.contains(&(*a - *b))
     };
+    // Ignoring the element to drop, check each pair of adjacent values.
     row.iter().enumerate()
         .filter_map(|(i, v)| if i == drop { None } else { Some(v) } )
         .tuple_windows().all(check)
   }
 }
 
+/// Is this row ok given that we drop one element?
 fn is_ok(row: &Row) -> bool {
+  // try each position to drop and if we find one, accept the Row.
   for drop in 0..row.len() {
     if is_good_with_drop(&row, drop) {
       return true
