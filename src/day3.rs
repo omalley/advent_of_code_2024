@@ -1,35 +1,102 @@
-pub fn generator(input: &str) -> String {
-  input.to_string()
+use std::iter::Peekable;
+use std::str::Chars;
+
+#[derive(Clone,Copy,Debug,PartialEq)]
+pub enum Command {
+  Mul(i32, i32),
+  Do,
+  Dont,
 }
 
-fn parse_int(s: &str) -> Result<i32, String> {
-  s.parse().map_err(|_| format!("Can't parse integer - '{s}'"))
+fn parse_int(stream: &mut Peekable<Chars>) -> Option<i32> {
+  let mut result = 0;
+  for i in 0..3 {
+    if let Some(peek) = stream.peek() {
+      if peek.is_numeric() {
+        result = result * 10 + stream.next().unwrap().to_digit(10).unwrap() as i32;
+      }
+    } else if i == 0 {
+      return None;
+    } else {
+      break;
+    }
+  }
+  Some(result)
 }
 
-pub fn part1(input: &str) -> i32 {
-  let mul_pattern = regex_static::static_regex!(r"mul\((\d{1,3}),(\d{1,3})\)");
-  mul_pattern.captures_iter(input).map(|cap| {
-    let (_, [left, right]) = cap.extract();
-    parse_int(left).unwrap() * parse_int(right).unwrap()
+fn consume_literal(stream: &mut Peekable<Chars>, lit: &str) -> bool {
+  for ch in lit.chars() {
+    if let Some(next) = stream.next() {
+      if next != ch {
+        return false;
+      }
+    }
+  }
+  true
+}
+
+fn next_command(stream: &mut Peekable<Chars>) -> Option<Command> {
+  while let Some(ch) = stream.next() {
+    match ch {
+      // match mul(999,999)
+      'm' => {
+        if !consume_literal(stream, "ul(") { continue }
+        if let Some(left) = parse_int(stream) {
+          if !consume_literal(stream, ",") { continue }
+          if let Some(right) = parse_int(stream) {
+            if !consume_literal(stream, ")") { continue }
+            return Some(Command::Mul(left, right));
+          }
+        }
+      }
+      // match do() and don't()
+      'd' => {
+        if !consume_literal(stream, "o") { continue }
+        match stream.peek() {
+          Some('(') => {
+            if !consume_literal(stream, "()") { continue }
+            return Some(Command::Do);
+          }
+          Some('n') => {
+            if !consume_literal(stream, "n't()") { continue }
+            return Some(Command::Dont);
+          }
+          _ => {}
+        }
+      }
+      _ => {}
+    }
+  }
+  None
+}
+
+pub fn generator(input: &str) -> Vec<Command> {
+  let mut stream = input.chars().peekable();
+  let mut result = Vec::new();
+  while let Some(command) = next_command(&mut stream) {
+    result.push(command);
+  }
+  result
+}
+
+pub fn part1(input: &[Command]) -> i32 {
+  input.iter().map(|c| match c {
+    Command::Mul(x, y) => x * y,
+    _ => 0,
   }).sum()
 }
 
-pub fn part2(input: &str) -> i32 {
-  let cmd_pattern = regex_static::static_regex!(
-    r"mul\((\d{1,3}),(\d{1,3})\)|do\(\)|don't\(\)");
+pub fn part2(input: &[Command]) -> i32 {
   let mut result = 0;
   let mut enabled = true;
-  for cap in cmd_pattern.captures_iter(input) {
-    match &cap.get(0).unwrap().as_str()[0..3] {
-      "mul" => {
+  for cmd in input {
+    match cmd {
+      Command::Mul(left, right) => {
         if enabled {
-          result += parse_int(cap.get(1).unwrap().as_str()).unwrap() *
-              parse_int(cap.get(2).unwrap().as_str()).unwrap();
-        }
-      }
-      "do(" => { enabled = true; }
-      "don" => { enabled = false }
-      _ => {}
+          result += left * right;
+        }}
+      Command::Do => { enabled = true; }
+      Command::Dont => { enabled = false; }
     }
   }
   result
