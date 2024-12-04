@@ -26,10 +26,11 @@ fn parse_int(stream: &mut Peekable<Chars>) -> Option<i32> {
 
 fn consume_literal(stream: &mut Peekable<Chars>, lit: &str) -> bool {
   for ch in lit.chars() {
-    if let Some(next) = stream.next() {
-      if next != ch {
+    if let Some(next) = stream.peek() {
+      if *next != ch {
         return false;
       }
+      stream.next();
     }
   }
   true
@@ -104,7 +105,13 @@ pub fn part2(input: &[Command]) -> i32 {
 
 #[cfg(test)]
 mod tests {
-  use super::{generator, part1, part2};
+  use super::{Command, generator, part1, part2};
+
+  #[test]
+  fn test_generator() {
+    let output = generator("ddo(),don't(mul(3,4)");
+    assert_eq!(vec![Command::Do, Command::Mul(3,4)], output);
+  }
 
   const INPUT: &str =
 "xmul(2,4)%&mul[3,7]!@^do_not_mul(5,5)+mul(32,64]then(mul(11,8)mul(8,5))";
