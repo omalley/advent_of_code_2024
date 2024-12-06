@@ -1,16 +1,17 @@
 use itertools::Itertools;
 use smallvec::{SmallVec, ToSmallVec};
 
-pub type RuleId = u16;
+pub type PageId = u16;
 
-fn parse_int(s: &str) -> Result<RuleId, String> {
+fn parse_int(s: &str) -> Result<PageId, String> {
   s.parse().map_err(|_| format!("Can't parse integer - '{s}'"))
 }
 
+/// A single rule stating which page comes before another.
 #[derive(Debug,Eq,Ord,PartialOrd,PartialEq)]
 struct Rule {
-  previous: RuleId,
-  following: RuleId,
+  previous: PageId,
+  following: PageId,
 }
 
 impl Rule {
@@ -22,23 +23,24 @@ impl Rule {
   }
 }
 
+/// Grouping the rules by their previous page.
 #[derive(Debug)]
 pub struct RuleGroup {
-  previous: RuleId,
-  following_list: SmallVec<[RuleId; 32]>,
+  previous: PageId,
+  following_list: PageList,
 }
 
-pub type Printing = SmallVec<[RuleId; 32]>;
+pub type PageList = SmallVec<[PageId; 32]>;
 
-fn parse_printing(line: &str) -> Result<Printing, String> {
+fn parse_printing(line: &str) -> Result<PageList, String> {
   line.split(",").map(parse_int).try_collect()
 }
 
 #[derive(Debug)]
 pub struct Input {
   rules: Vec<RuleGroup>,
-  printings: Vec<Printing>,
-  max_id: RuleId,
+  printings: Vec<PageList>,
+  max_id: PageId,
 }
 
 pub fn generator(input: &str) -> Input {
@@ -54,11 +56,13 @@ pub fn generator(input: &str) -> Input {
       printings.push(parse_printing(line).expect("Can't parse printing"));
     }
   }
+  // Sort the rules and group them together to form the rule groups.
   simple_rules.sort_unstable();
   let mut rules = Vec::new();
   let mut max_id = 0;
-  for (previous, chunk) in &simple_rules.into_iter().chunk_by(|r| r.previous) {
-    let following_list: SmallVec<[RuleId; 32]> = chunk.map(|r| r.following).collect();
+  for (previous, chunk) in &simple_rules.into_iter()
+      .chunk_by(|r| r.previous) {
+    let following_list: PageList = chunk.map(|r| r.following).collect();
     max_id = max_id.max(*following_list.iter().max().unwrap_or(&0));
     max_id = max_id.max(previous);
     rules.push(RuleGroup{previous, following_list})
@@ -66,12 +70,16 @@ pub fn generator(input: &str) -> Input {
   Input{rules, printings, max_id}
 }
 
-fn find_rule(rules: &[RuleGroup], rule_id: RuleId) -> Option<&RuleGroup> {
-  rules.binary_search_by(|probe| probe.previous.cmp(&rule_id))
+/// Look up which RuleGroup applies.
+fn find_rule(rules: &[RuleGroup], page: PageId) -> Option<&RuleGroup> {
+  rules.binary_search_by(|probe| probe.previous.cmp(&page))
       .map(|id| &rules[id]).ok()
 }
 
-fn is_order_correct(rules: &[RuleGroup], printing: &[RuleId], pad: &mut [bool]) -> bool {
+/// Is the order of the pages correct?
+/// The pad is a vector large enough to index by any of the PageId and must be
+/// false before and after the function call.
+fn is_order_correct(rules: &[RuleGroup], printing: &[PageId], pad: &mut [bool]) -> bool {
   let mut result = true;
   'page: for page in printing {
     pad[*page as usize] = true;
@@ -90,11 +98,13 @@ fn is_order_correct(rules: &[RuleGroup], printing: &[RuleId], pad: &mut [bool]) 
   result
 }
 
-fn find_middle(printing: &[RuleId]) -> RuleId {
+/// Find the middle page by index.
+fn find_middle(printing: &[PageId]) -> PageId {
   printing[printing.len() / 2]
 }
 
 pub fn part1(input: &Input) -> u64 {
+  // Allocate a reusable scratch pag to record which pages we've processed.
   let mut pad = vec![false; input.max_id as usize + 1];
   input.printings.iter()
       .filter(|&pr| is_order_correct(&input.rules, pr, &mut pad))
@@ -107,8 +117,12 @@ fn find_violation(rule: &RuleGroup, pad: &[Option<usize>]) -> Option<usize> {
   rule.following_list.iter().filter_map(|id| pad[*id as usize]).min()
 }
 
-fn fix_printing(rules: &[RuleGroup], printing: &[RuleId],
-                pad: &mut [Option<usize>]) -> Option<Printing> {
+/// If a given printing breaks the rules, fix the order of pages so that the
+/// rules are satisfied. This must be a stable sort.
+/// The pad is a scratch pad that must be large enough for any of the PageId and
+/// must be None before and after the call.
+fn fix_printing(rules: &[RuleGroup], printing: &[PageId],
+                pad: &mut [Option<usize>]) -> Option<PageList> {
   let mut was_broken = false;
   let mut fix = printing.to_smallvec();
   let mut i = 0;
