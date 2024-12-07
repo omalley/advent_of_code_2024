@@ -1,7 +1,6 @@
 use itertools::Itertools;
 use smallvec::SmallVec;
 
-
 pub type Number = i64;
 
 fn parse_int(s: &str) -> Result<Number, String> {
@@ -53,6 +52,8 @@ fn has_solution<const HAS_CONCAT:bool>(target: Number,
 fn solvable<const HAS_CONCAT:bool>(row: &Row) -> bool {
   if row.inputs.is_empty() {
     false
+  } else if *row.inputs.iter().min().unwrap() < 1 {
+    panic!("not handling negative numbers")
   } else {
     has_solution::<HAS_CONCAT>(row.target, row.inputs[0], &row.inputs[1..])
   }
