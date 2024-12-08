@@ -26,26 +26,46 @@ pub fn generator(input: &str) -> Vec<Row> {
   input.lines().map(parse_line).try_collect().expect("Can't parse input")
 }
 
-fn concat(left: Number, right: Number) -> Number {
-  let len = right.ilog10() + 1;
-  left * (10 as Number).saturating_pow(len) + right
+fn subtract(right: Number, result: Number) -> Option<Number> {
+  Some(result - right)
 }
 
-fn has_solution<const HAS_CONCAT:bool>(target: Number,
-                                       accumulated: Number, inputs: &[Number]) -> bool {
-  if accumulated > target {
-    return false
+fn divide(right: Number, result: Number) -> Option<Number> {
+  if right != 0 && result % right == 0 {
+    Some(result / right)
+  } else {
+    None
   }
-  match inputs.len() {
-    0 => target == accumulated,
-    1 => (target == accumulated + inputs[0]) ||
-        (target == accumulated * inputs[0]) ||
-        (HAS_CONCAT && target == concat(accumulated, inputs[0])),
-    _ =>
-      has_solution::<HAS_CONCAT>(target, accumulated + inputs[0], &inputs[1..]) ||
-          has_solution::<HAS_CONCAT>(target, accumulated * inputs[0], &inputs[1..]) ||
-          (HAS_CONCAT && has_solution::<HAS_CONCAT>(target,
-                                                    concat(accumulated, inputs[0]), &inputs[1..]))
+}
+
+fn split(right: Number, result: Number) -> Option<Number> {
+  let pow10 = (10 as Number).saturating_pow(right.ilog10() + 1);
+  if result % pow10 == right {
+    Some(result / pow10)
+  } else {
+    None
+  }
+}
+
+fn has_solution<const HAS_CONCAT:bool>(inputs: &[Number], result: Number) -> bool {
+  let len = inputs.len();
+  match len {
+    0 => false,
+    1 => result == inputs[0],
+    2 => {
+      let eqls = |r| r == inputs[0];
+      (HAS_CONCAT && split(inputs[1], result).is_some_and(eqls)) ||
+          divide(inputs[1], result).is_some_and(eqls) ||
+          subtract(inputs[1], result).is_some_and(eqls)
+    },
+    _ => {
+      let recurse =
+          |r| has_solution::<HAS_CONCAT>(&inputs[..len - 1], r);
+      (HAS_CONCAT && split(inputs[len - 1], result).is_some_and(recurse)) ||
+          divide(inputs[len - 1], result).is_some_and(recurse) ||
+          subtract(inputs[len - 1], result).is_some_and(recurse)
+    }
+
   }
 }
 
@@ -55,7 +75,8 @@ fn solvable<const HAS_CONCAT:bool>(row: &Row) -> bool {
   } else if *row.inputs.iter().min().unwrap() < 1 {
     panic!("not handling negative numbers")
   } else {
-    has_solution::<HAS_CONCAT>(row.target, row.inputs[0], &row.inputs[1..])
+    let result = has_solution::<HAS_CONCAT>(&row.inputs, row.target);
+    result
   }
 }
 
