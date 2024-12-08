@@ -38,8 +38,16 @@ fn divide(right: Number, result: Number) -> Option<Number> {
   }
 }
 
+fn pow10(n: Number) -> Number {
+  let mut result = 10;
+  while n != n % result {
+    result *= 10;
+  }
+  result
+}
+
 fn split(right: Number, result: Number) -> Option<Number> {
-  let pow10 = (10 as Number).saturating_pow(right.ilog10() + 1);
+  let pow10 = pow10(right);
   if result % pow10 == right {
     Some(result / pow10)
   } else {
