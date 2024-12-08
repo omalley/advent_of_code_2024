@@ -83,8 +83,7 @@ fn solvable<const HAS_CONCAT:bool>(row: &Row) -> bool {
   } else if *row.inputs.iter().min().unwrap() < 1 {
     panic!("not handling negative numbers")
   } else {
-    let result = has_solution::<HAS_CONCAT>(&row.inputs, row.target);
-    result
+    has_solution::<HAS_CONCAT>(&row.inputs, row.target)
   }
 }
 
