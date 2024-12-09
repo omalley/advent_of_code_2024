@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use itertools::Itertools;
+use smallvec::SmallVec;
 
 #[derive(Clone,Copy,Debug,Eq,Hash,PartialEq)]
 pub enum Direction{
@@ -89,10 +89,10 @@ impl Grid {
                 }))
   }
 
-  fn get(&self, position: &Coordinate) -> Option<&Floor> {
+  fn get(&self, position: &Coordinate) -> Option<Floor> {
     if (0..self.bounds.x).contains(&position.x) &&
         (0..self.bounds.y).contains(&position.y) {
-      Some(&self.floor[position.y as usize][position.x as usize])
+      Some(self.floor[position.y as usize][position.x as usize])
     } else {
       None
     }
@@ -109,74 +109,107 @@ impl Grid {
     let guard = Self::find_guard(&floor).ok_or("No guard found")?;
     Ok(Grid { floor, guard, bounds })
   }
-
-  fn walk(&self, guard: &mut Guard) -> Option<usize> {
-    let forward_spot = guard.position.step(guard.facing);
-    if self.get(&forward_spot).unwrap_or(&Floor::Empty).is_occupied() {
-      guard.turn_right();
-      Some(0)
-    } else {
-      guard.position = forward_spot;
-      if (0..self.bounds.x).contains(&guard.position.x) &&
-          (0..self.bounds.y).contains(&guard.position.y) {
-        Some(1)
-      } else {
-        None
-      }
-    }
-  }
-
-  fn is_loop(&self) -> bool {
-    let mut guard = self.guard.clone();
-    let mut covered: HashSet<Guard> = HashSet::new();
-    while let Some(steps) = self.walk(&mut guard) {
-      if steps > 0 && !covered.insert(guard.clone()) {
-        return true
-      }
-    }
-    false
-  }
 }
 
 pub fn generator(input: &str) -> Grid {
   Grid::from_string(input).expect("Can't parse input")
 }
 
-pub fn part1(input: &Grid) -> usize {
-  let mut guard = input.guard.clone();
-  let mut places: HashSet<Coordinate> = HashSet::new();
-  places.insert(guard.position.clone());
-  while let Some(steps) = input.walk(&mut guard) {
-    if steps > 0 {
-      places.insert(guard.position.clone());
-    }
-  }
-  places.len()
+#[derive(Clone,Debug,Default)]
+struct SquareState {
+  stack: SmallVec<[Guard; 4]>,
 }
 
-fn get_guarded_locations(input: &Grid) -> HashSet<Coordinate> {
-  let mut guard = input.guard.clone();
-  let mut places: HashSet<Coordinate> = HashSet::new();
-  while let Some(steps) = input.walk(&mut guard) {
-    if steps > 0 {
-      places.insert(guard.position.clone());
+struct WalkState {
+  state: Vec<Vec<SquareState>>,
+  current: Guard,
+  square_count: usize,
+}
+
+impl WalkState {
+
+  fn get_mut(&mut self, position: &Coordinate) -> &mut SquareState {
+    &mut self.state[position.y as usize][position.x as usize]
+  }
+
+  fn from_grid(grid: &Grid) -> Self {
+    let state = vec![vec![SquareState::default(); grid.bounds.x as usize];
+                    grid.bounds.y as usize];
+    let current = grid.guard.clone();
+    WalkState{state, current, square_count: 1}
+  }
+
+  /// Walk through the grid until either the path loops or it leaves the edge.
+  fn walk_is_loop(&mut self, grid: &Grid) -> bool {
+    loop {
+      let forward_coordinate = self.current.position.step(self.current.facing);
+      if let Some(forward_floor) = grid.get(&forward_coordinate) {
+        if forward_floor.is_occupied() {
+          self.current.turn_right();
+        } else {
+          // If we haven't been to this square, bump up the count.
+          if self.get_mut(&forward_coordinate).stack.is_empty() && forward_floor == Floor::Empty {
+            self.square_count += 1;
+          }
+          let old = self.current.clone();
+          if self.get_mut(&forward_coordinate).stack.contains(&old) {
+            return true
+          }
+          self.get_mut(&forward_coordinate).stack.push(old);
+          self.current.position = forward_coordinate;
+        }
+      } else {
+        return false
+      }
     }
   }
-  places
+
+  fn pop(&mut self) -> Option<Coordinate> {
+    let current = self.current.position.clone();
+    if let Some(prev) = self.get_mut(&current).stack.pop() {
+      self.current = prev;
+      Some(current)
+    } else {
+      None
+    }
+  }
+
+  fn place_block(&mut self, grid: &mut Grid, place: &Coordinate) -> bool {
+    // It should be empty or the guard, but we can't place it on the guard.
+    // If this is not the first time to this place, we can't test it now.
+    if grid.get(place) != Some(Floor::Empty) || !self.get_mut(place).stack.is_empty() {
+      return false
+    }
+    *grid.get_mut(place) = Floor::Full;
+    let orig_guard = self.current.clone();
+    self.get_mut(&orig_guard.position).stack.push(orig_guard.clone());
+    let is_loop = self.walk_is_loop(grid);
+    // reset self
+    while self.current != orig_guard {
+      if self.pop().is_none() {
+        panic!("Crap");
+      }
+    }
+    *grid.get_mut(place) = Floor::Empty;
+    is_loop
+  }
+}
+
+pub fn part1(input: &Grid) -> usize {
+  let mut state = WalkState::from_grid(input);
+  state.walk_is_loop(input);
+  state.square_count
 }
 
 pub fn part2(input: &Grid) -> usize {
   let mut playground = input.clone();
-  // Get the places the guard goes other than the start location
-  let mut guarded = get_guarded_locations(input);
-  guarded.remove(&input.guard.position);
+  let mut state = WalkState::from_grid(&playground);
+  assert!(!state.walk_is_loop(&playground), "shouldn't loop");
   let mut result = 0;
-  for new_obstruction in guarded {
-    *playground.get_mut(&new_obstruction) = Floor::Full;
-    if playground.is_loop() {
+  while let Some(new_block) = state.pop() {
+    if state.place_block(&mut playground, &new_block) {
       result += 1;
     }
-    *playground.get_mut(&new_obstruction) = Floor::Empty;
   }
   result
 }
