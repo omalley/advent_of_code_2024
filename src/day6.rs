@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use itertools::Itertools;
+use smallvec::SmallVec;
 
 #[derive(Clone,Copy,Debug,Eq,Hash,PartialEq)]
 pub enum Direction{
@@ -140,6 +141,36 @@ impl Grid {
 
 pub fn generator(input: &str) -> Grid {
   Grid::from_string(input).expect("Can't parse input")
+}
+
+#[derive(Debug,Default)]
+struct SquareState {
+  stack: SmallVec<[Guard; 4]>,
+}
+
+struct WalkState {
+  state: Vec<Vec<SquareState>>,
+  current: Guard,
+  count: usize,
+}
+
+impl WalkState {
+
+  fn get_mut(&mut self, position: &Coordinate) -> &mut SquareState {
+    &mut self.state[position.y as usize][position.x as usize]
+  }
+
+  fn from_grid(grid: &Grid) -> Self {
+    let mut state = vec![vec![SquareState::default(); grid.bounds.x as usize];
+                    grid.bounds.y as usize];
+    let current = grid.guard.clone();
+    state[current.position.y as usize][current.position.x as usize].stack.push(current.clone());
+    WalkState{state, current, count: 0}
+  }
+
+  fn step(&mut self) {
+
+  }
 }
 
 pub fn part1(input: &Grid) -> usize {
