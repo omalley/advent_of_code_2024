@@ -15,16 +15,12 @@ impl FileRange {
   }
 }
 
-fn parse_int(ch: char) -> Result<Position, String> {
-  ch.to_digit(10).ok_or(format!("{} is not a valid integer", ch))
-}
-
 pub fn generator(input: &str) -> Vec<FileRange> {
   let mut next_address = 0;
   let mut result = Vec::new();
   let mut is_file = true;
   for ch in input.trim().chars() {
-    let size = parse_int(ch).expect("Can't parse integer");
+    let size = ch.to_digit(10).unwrap();
     if is_file {
       let id = result.len() as Position;
       result.push(FileRange{range: next_address..(next_address + size), id });
