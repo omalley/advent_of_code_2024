@@ -89,6 +89,86 @@ fn compact(files: &[FileRange]) -> Vec<FileRange> {
   result
 }
 
+const SIZE_COUNT: usize = 10;
+
+#[derive(Debug)]
+struct FileCompactor<'a> {
+  buckets: [Vec<FileRange>; SIZE_COUNT],
+  done: Vec<bool>,
+  files: &'a [FileRange],
+  next_address: Position,
+}
+
+impl<'a> FileCompactor<'a> {
+  fn from_files(files: &'a [FileRange]) -> Self {
+    let mut buckets: [Vec<FileRange>; SIZE_COUNT] = Default::default();
+    for f in files {
+      buckets[f.range.len()].push(f.clone());
+    }
+    let done = vec![false; files.len()];
+    Self{ files, done, buckets, next_address: 0}
+  }
+
+  fn next_file(&mut self) -> Option<FileRange> {
+    loop {
+      if !self.files.is_empty() {
+        if self.files[0].range.start == self.next_address {
+          self.next_address = self.files[0].range.end;
+          let result = self.files[0].clone();
+          self.files = &self.files[1..];
+          if !self.done[result.id as usize] {
+            self.done[result.id as usize] = true;
+            return Some(result)
+          }
+        } else {
+          let space = self.files[0].range.start - self.next_address;
+          let mut best = None;
+          for s in 1..=space {
+            if !self.buckets[s as usize].is_empty() {
+              let last = self.buckets[s as usize].len() - 1;
+              if let Some((prev, _)) = best {
+                if self.buckets[s as usize][last].id > prev {
+                  best = Some((self.buckets[s as usize][last].id, s));
+                }
+              } else {
+                best = Some((self.buckets[s as usize][last].id, s));
+              }
+            }
+          }
+          if let Some((_, size)) = best {
+            let mut result = self.buckets[size as usize].pop().unwrap();
+            result.range = self.next_address..self.next_address + size;
+            self.next_address += size;
+            if !self.done[result.id as usize] {
+              self.done[result.id as usize] = true;
+              return Some(result)
+            }
+          } else {
+            let result = self.files[0].clone();
+            self.files = &self.files[1..];
+            self.next_address = result.range.end;
+            if !self.done[result.id as usize] {
+              self.done[result.id as usize] = true;
+              return Some(result)
+            }
+          }
+        }
+      } else {
+        return None
+      }
+    }
+  }
+}
+
+fn file_compact(files: &[FileRange]) -> Vec<FileRange> {
+  let mut compactor = FileCompactor::from_files(files);
+  let mut result = Vec::new();
+  while let Some(next) = compactor.next_file() {
+    result.push(next);
+  }
+  result
+}
+
 fn checksum(files: &[FileRange]) -> u64 {
   files.iter().map(|f| f.checksum()).sum()
 }
@@ -98,7 +178,7 @@ pub fn part1(input: &[FileRange]) -> u64 {
 }
 
 pub fn part2(input: &[FileRange]) -> u64 {
-  0
+  checksum(&file_compact(input))
 }
 
 #[cfg(test)]
