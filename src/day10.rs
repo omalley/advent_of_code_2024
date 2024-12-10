@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use smallvec::SmallVec;
 
 type Elevation = u8;
@@ -81,7 +80,17 @@ pub fn part1(input: &Map) -> u64 {
 }
 
 pub fn part2(input: &Map) -> u64 {
-  0
+  let mut result = 0;
+  for dest in &input.ends {
+    let mut current = vec![dest.clone()];
+    for elevation in (START..END).rev() {
+      let next: Vec<Coordinate> = current.iter()
+          .flat_map(|c| input.potential_previous(*c, elevation+1)).collect();
+      current = next;
+    }
+    result += current.len() as u64;
+  }
+  result
 }
 
 #[cfg(test)]
