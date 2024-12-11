@@ -151,7 +151,7 @@ struct SquareState {
 struct WalkState {
   state: Vec<Vec<SquareState>>,
   current: Guard,
-  count: usize,
+  square_count: usize,
 }
 
 impl WalkState {
@@ -165,7 +165,7 @@ impl WalkState {
                     grid.bounds.y as usize];
     let current = grid.guard.clone();
     state[current.position.y as usize][current.position.x as usize].stack.push(current.clone());
-    WalkState{state, current, count: 0}
+    WalkState{state, current, square_count: 1}
   }
 
   fn step(&mut self) {
