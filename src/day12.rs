@@ -53,7 +53,7 @@ impl Grid {
   fn count_corners(&self, pos: &Coordinate) -> usize {
     let crop = self.get(pos);
     let neighbors = self.neighbors::<true>(pos, crop);
-    let result = match neighbors.len() {
+    match neighbors.len() {
       0 => 8,
       1 => {
         4 + self.count_neighbors(pos, crop,
@@ -88,18 +88,14 @@ impl Grid {
                                } else {
                                  &[(-1, -1), (1, -1)]
                                }
+                             } else if neighbors[0].y < pos.y {
+                               &[(1, -1), (1, 1)]
                              } else {
-                               if neighbors[0].y < pos.y {
-                                 &[(1, -1), (1, 1)]
-                               } else {
-                                 &[(-1, -1), (-1, 1)]
-                               }
+                               &[(-1, -1), (-1, 1)]
                              })
       }
       _ => 0,
-    };
-    //println!("corners {pos:?} = {result}/2");
-    result
+    }
   }
 }
 
@@ -143,21 +139,21 @@ fn find_sizes(grid: &Grid) -> Vec<Vec<usize>> {
 }
 
 pub fn part1(input: &Input) -> usize {
-  input.grid.plots.iter().enumerate()
+  input.sizes.iter().enumerate()
       .map(|(y, row)| row.iter().enumerate()
-          .map(|(x, _)| {
+          .map(|(x, size)| {
             let coord = Coordinate{x: x as i32, y: y as i32};
-            input.sizes[y][x] * (4 - input.grid.neighbors::<true>(&coord, input.grid.get(&coord)).len())})
+            size * (4 - input.grid.neighbors::<true>(&coord, input.grid.get(&coord)).len())})
           .sum::<usize>())
       .sum()
 }
 
 pub fn part2(input: &Input) -> usize {
-  input.grid.plots.iter().enumerate()
+  input.sizes.iter().enumerate()
       .map(|(y, row)| row.iter().enumerate()
-          .map(|(x, _)| {
+          .map(|(x, size)| {
             let coord = Coordinate{x: x as i32, y: y as i32};
-            input.sizes[y][x] * input.grid.count_corners(&coord)})
+            size * input.grid.count_corners(&coord)})
           .sum::<usize>())
       .sum::<usize>() / 2
 }
