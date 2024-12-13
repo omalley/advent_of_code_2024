@@ -13,6 +13,24 @@ now.
 I prefer writing clean solutions that perform well. I'm far less concerned
 with minimizing the time to an answer.
 
+This year's current times on my laptop are:
+
+| Time (secs) | Day |
+| ----------- | --- |
+|   0.049140 |    6 |
+|   0.007300 |   11 |
+|   0.000718 |   12 |
+|   0.000620 |   10 |
+|   0.000485 |    5 |
+|   0.000421 |    7 |
+|   0.000362 |    4 |
+|   0.000304 |    9 |
+|   0.000217 |   13 |
+|   0.000139 |    2 |
+|   0.000120 |    8 |
+|   0.000112 |    1 |
+|   0.000071 |    3 |
+  
 The three targets that I use are:
 * cargo run --release
 * cargo test
