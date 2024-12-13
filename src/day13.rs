@@ -90,10 +90,10 @@ pub fn part1(input: &[Machine]) -> i64 {
 }
 
 fn part2_munge(machine: &Machine) -> Machine {
-  let mut goal = machine.goal.clone();
-  goal.x += 10000000000000;
-  goal.y += 10000000000000;
-  Machine{button_a: machine.button_a.clone(), button_b: machine.button_b.clone(), goal}
+  let mut result = machine.clone();
+  result.goal.x += 10000000000000;
+  result.goal.y += 10000000000000;
+  result
 }
 
 pub fn part2(input: &[Machine]) -> i64 {
