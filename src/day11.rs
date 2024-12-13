@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use ahash::AHashMap;
 
 fn parse_int(s: &str) -> Result<u64, String> {
   s.parse().map_err(|_| format!("Can't parse integer - '{s}'"))
 }
 
-pub fn generator(input: &str) -> HashMap<u64, usize> {
-  let mut result = HashMap::new();
+pub fn generator(input: &str) -> AHashMap<u64, usize> {
+  let mut result: AHashMap<u64, usize> = AHashMap::default();
   for number in input.split_whitespace().map(parse_int) {
     let number = number.expect("Could not parse number");
     *result.entry(number).or_insert(0) += 1;
@@ -23,7 +23,7 @@ fn split_number(num: u64) -> Option<(u64,u64)> {
   }
 }
 
-fn apply_rules(values: &mut HashMap<u64, usize>) {
+fn blink(values: &mut AHashMap<u64, usize>) {
   let mut result = Vec::new();
   for (num, count) in values.iter() {
     if *num == 0 {
@@ -41,20 +41,20 @@ fn apply_rules(values: &mut HashMap<u64, usize>) {
   }
 }
 
-pub fn part1(input: &HashMap<u64, usize>) -> usize {
+fn do_blinks(input: &AHashMap<u64, usize>, blinks: usize) -> usize {
   let mut work = input.clone();
-  for _ in 0..25 {
-    apply_rules(&mut work);
+  for _ in 0..blinks {
+    blink(&mut work);
   }
   work.values().sum()
 }
 
-pub fn part2(input: &HashMap<u64, usize>) -> usize {
-  let mut work = input.clone();
-  for _ in 0..75 {
-    apply_rules(&mut work);
-  }
-  work.values().sum()
+pub fn part1(input: &AHashMap<u64, usize>) -> usize {
+  do_blinks(input, 25)
+}
+
+pub fn part2(input: &AHashMap<u64, usize>) -> usize {
+  do_blinks(input, 75)
 }
 
 #[cfg(test)]

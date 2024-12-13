@@ -10,6 +10,7 @@ keywords = ["aoc", "advent", "example"]
 description = "Owen's Solutions to AoC 2024"
 
 [dependencies]
+ahash = "0.8"
 argh = "0.1"
 array2d = "0.3"
 chrono = "0.4"

@@ -34,4 +34,4 @@ macro_rules! benchmarks {
   }
 }
 
-benchmarks!(6);
+benchmarks!(11);
