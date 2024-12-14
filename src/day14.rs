@@ -38,12 +38,12 @@ impl Robot {
         .ok_or("Can't split line {s}")?;
     let location = Coordinate::from_str(loc_str)?;
     let velocity = Coordinate::from_str(vel_str)?;
-    Ok(Robot{location: location, velocity: velocity})
+    Ok(Robot{location, velocity})
   }
 
-  fn move_forward(&mut self, steps: i64, width: Position, height: Position) {
-    self.location.x = (self.location.x + self.velocity.x * steps).rem_euclid(width);
-    self.location.y = (self.location.y + self.velocity.y * steps).rem_euclid(height);
+  fn move_forward(&mut self, steps: usize, width: Position, height: Position) {
+    self.location.x = (self.location.x + self.velocity.x * steps as Position).rem_euclid(width);
+    self.location.y = (self.location.y + self.velocity.y * steps as Position).rem_euclid(height);
   }
 
   fn quadrant(&self, width: Position, height: Position) -> Option<usize> {
@@ -64,6 +64,7 @@ pub fn generator(input: &str) -> Vec<Robot> {
   input.lines().map(Robot::from_str).try_collect().expect("Can't parse input")
 }
 
+/// Place the robots into quadrants and multiply the counts.
 fn score(robots: &[Robot], width: Position, height: Position) -> usize {
   let mut counts = [0usize; 4];
   robots.iter().filter_map(|r| r.quadrant(width, height))
@@ -78,31 +79,68 @@ pub fn part1(input: &[Robot]) -> usize {
   score(&working, Robot::BOARD_WIDTH, Robot::BOARD_HEIGHT)
 }
 
+/// Is this robot in the upward facing triangle in middle of the grid?
+/// This was my attempt to find the robots making a Christmas tree and
+/// it worked reasonably well.
 fn tree_filter(robot: &Robot, width: Position, height: Position) -> bool {
   robot.location.y * width >= height * (2 * robot.location.x - width).abs()
 }
 
-pub fn part2(input: &[Robot]) -> usize {
-  let mut working = input.to_vec();
-  let goal = input.len() * 75 / 100;
+/// How many robots are inside the tree filter?
+fn tree_filter_count(robots: &[Robot], width: Position, height: Position) -> usize {
+  robots.iter().filter(|r| tree_filter(r, width, height)).count()
+}
+
+/// Find the time that has enough of the robots in the tree filter region.
+fn find_tree(robots: &mut [Robot], goal_percent: usize,
+             width: Position, height: Position) -> usize {
+  let goal = robots.len() * goal_percent / 100;
   let mut steps = 0;
-  while working.iter()
-      .filter(|r| tree_filter(r, Robot::BOARD_WIDTH, Robot::BOARD_HEIGHT))
-      .count() < goal {
+  loop {
     steps += 1;
-    working.iter_mut().for_each(|r|
-        r.move_forward(1, Robot::BOARD_WIDTH, Robot::BOARD_HEIGHT));
+    for robot in robots.iter_mut() {
+      robot.move_forward(1, width, height)
+    }
+    if tree_filter_count(robots, width, height) > goal {
+      break
+    }
   }
-  /*
-  let mut display = [[' '; Robot::BOARD_WIDTH as usize]; Robot::BOARD_HEIGHT as usize];
-  working.iter_mut().for_each(|r|
-      display[r.location.y as usize][r.location.x as usize] = '#');
+  steps
+}
+
+#[allow(dead_code)]
+fn display_robots(robots: &[Robot], width: Position, height: Position) {
+  let mut display = vec![vec![' '; width as usize]; height as usize];
+  for robot in robots {
+    display[robot.location.y as usize][robot.location.x as usize] =
+        if tree_filter(robot, width, height) { '#' } else { '+' };
+  }
   for row in display {
     for c in row {
       print!("{}", c);
     }
     println!();
-  } */
+  }
+}
+
+pub fn part2(input: &[Robot]) -> usize {
+  let mut working = input.to_vec();
+  let goal_percent = 75;
+  let goal = working.len() * goal_percent / 100;
+  let sample = input.len() / 10;
+  let mut steps = 0;
+  // Find a time when most of the robots are in the tree filter region.
+  while tree_filter_count(&working, Robot::BOARD_WIDTH, Robot::BOARD_HEIGHT) < goal {
+    // Use a sample of the robots to find a candidate time.
+    let new_steps = find_tree(&mut working[..sample],
+                              goal_percent, Robot::BOARD_WIDTH, Robot::BOARD_HEIGHT);
+    // advance the other robots too
+    for robot in working[sample..].iter_mut() {
+      robot.move_forward(new_steps, Robot::BOARD_WIDTH, Robot::BOARD_HEIGHT)
+    }
+    steps += new_steps;
+  }
+  //display_robots(&working, Robot::BOARD_WIDTH, Robot::BOARD_HEIGHT);
   steps
 }
 
