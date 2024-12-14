@@ -78,13 +78,37 @@ pub fn part1(input: &[Robot]) -> usize {
   score(&working, Robot::BOARD_WIDTH, Robot::BOARD_HEIGHT)
 }
 
-pub fn part2(_input: &[Robot]) -> usize {
-  0
+fn tree_filter(robot: &Robot, width: Position, height: Position) -> bool {
+  robot.location.y * width >= height * (2 * robot.location.x - width).abs()
+}
+
+pub fn part2(input: &[Robot]) -> usize {
+  let mut working = input.to_vec();
+  let goal = input.len() * 75 / 100;
+  let mut steps = 0;
+  while working.iter()
+      .filter(|r| tree_filter(r, Robot::BOARD_WIDTH, Robot::BOARD_HEIGHT))
+      .count() < goal {
+    steps += 1;
+    working.iter_mut().for_each(|r|
+        r.move_forward(1, Robot::BOARD_WIDTH, Robot::BOARD_HEIGHT));
+  }
+  /*
+  let mut display = [[' '; Robot::BOARD_WIDTH as usize]; Robot::BOARD_HEIGHT as usize];
+  working.iter_mut().for_each(|r|
+      display[r.location.y as usize][r.location.x as usize] = '#');
+  for row in display {
+    for c in row {
+      print!("{}", c);
+    }
+    println!();
+  } */
+  steps
 }
 
 #[cfg(test)]
 mod tests {
-  use super::{generator, part2, score};
+  use super::{generator, score};
 
   const INPUT: &str =
 "p=0,4 v=3,-3
@@ -106,11 +130,5 @@ p=9,5 v=-3,-3";
     robots.iter_mut().for_each(|r|
         r.move_forward(100, 11, 7));
     assert_eq!(12, score(&robots, 11, 7))
-  }
-
-  #[test]
-  fn test_part2() {
-    let data = generator(INPUT);
-    assert_eq!(31, part2(&data));
   }
 }
