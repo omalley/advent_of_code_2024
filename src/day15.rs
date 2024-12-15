@@ -1,14 +1,31 @@
+use std::collections::VecDeque;
+use ahash::AHashSet;
 use array2d::Array2D;
 use itertools::Itertools;
 
-#[derive(Clone,Debug,Eq,PartialEq)]
+#[derive(Clone,Copy,Debug,Eq,PartialEq)]
+pub enum Side {
+  Left, Right, Both,
+}
+
+#[derive(Clone,Copy,Debug,Eq,PartialEq)]
 pub enum FloorKind {
-  Empty, Box, Wall,
+  Empty, Box(Side), Wall,
+}
+
+impl FloorKind {
+  /// Should this count a box for scoring?
+  fn is_box(self) -> bool {
+    match self {
+      FloorKind::Box(Side::Both) | FloorKind::Box(Side::Left) => true,
+      _ => false,
+    }
+  }
 }
 
 type Position = u16;
 
-#[derive(Clone,Debug,Eq,PartialEq)]
+#[derive(Clone,Debug,Eq,Hash,PartialEq)]
 pub struct Coordinate {
   y: Position,
   x: Position,
@@ -33,7 +50,7 @@ fn read_grid(input: &str) -> Result<(Array2D<FloorKind>, Coordinate), String> {
             .map(|(x, ch)| match ch {
               '#' => Ok(FloorKind::Wall),
               '.' => Ok(FloorKind::Empty),
-              'O' => Ok(FloorKind::Box),
+              'O' => Ok(FloorKind::Box(Side::Both)),
               '@' => {
                 guard = Some(Coordinate{y: y as Position, x: x as Position});
                 Ok(FloorKind::Empty)
@@ -47,10 +64,7 @@ fn read_grid(input: &str) -> Result<(Array2D<FloorKind>, Coordinate), String> {
 
 #[derive(Clone,Copy,Debug,Eq,PartialEq)]
 pub enum Direction {
-  North,
-  West,
-  South,
-  East,
+  North, West, South, East,
 }
 
 impl Direction {
@@ -63,52 +77,67 @@ impl Direction {
       _ => Err(format!("Invalid direction '{ch}'")),
     }
   }
-
-  fn opposite(&self) -> Direction {
-    match *self {
-      Direction::North => Direction::South,
-      Direction::West => Direction::East,
-      Direction::South => Direction::North,
-      Direction::East => Direction::West,
-    }
-  }
 }
 
 #[derive(Clone,Debug)]
 pub struct Grid {
   floor: Array2D<FloorKind>,
   guard: Coordinate,
+}
+
+#[derive(Clone,Debug)]
+pub struct Problem {
+  grid: Grid,
   instructions: Vec<Direction>,
 }
 
 impl Grid {
-  fn find_space(&self, location: &Coordinate, direction: Direction) -> Option<Coordinate> {
-    let mut result = location.clone();
-    loop {
-      result = result.step(direction);
-      if let Some(flr) = self.floor.get(result.y as usize, result.x as usize) {
-        match flr {
-          FloorKind::Wall => return None,
-          FloorKind::Empty => {return Some(result);},
-          FloorKind::Box => {}
+  /// Find the list of blocks to move. They should be moved in reverse order.
+  fn plan_move(&self, location: &Coordinate, direction: Direction) -> Option<Vec<Coordinate>> {
+    let mut result = Vec::with_capacity(20);
+    let mut pending = VecDeque::with_capacity(20);
+    let mut done = AHashSet::new();
+    pending.push_front(location.step(direction));
+    while let Some(location) = pending.pop_back() {
+      if done.insert(location.clone()) {
+        match self.floor.get(location.y as usize, location.x as usize) {
+          Some(FloorKind::Empty) => {}
+          Some(FloorKind::Box(side)) => {
+            match (direction, side) {
+              (Direction::East | Direction::West, _) | (_, Side::Both) => {},
+              (_, Side::Left) => {
+                let other = location.step(Direction::East);
+                if !done.contains(&other) {
+                  pending.push_back(other);
+                }
+              },
+              (_, Side::Right) => {
+                let other = location.step(Direction::West);
+                if !done.contains(&other) {
+                  pending.push_back(other);
+                }
+              },
+            }
+            pending.push_front(location.step(direction));
+            result.push(location);
+          }
+          _ => { return None }
         }
-      } else {
-        return None;
       }
     }
+    Some(result)
   }
 
   fn perform_commands(&mut self, instructions: &[Direction]) {
     for &instruction in instructions {
-      if let Some(dest) = self.find_space(&self.guard, instruction) {
-        let mut loc = dest.clone();
-        let backwards = instruction.opposite();
-        self.guard = self.guard.step(instruction);
-        while loc != self.guard {
-          self.floor.set(loc.y as usize, loc.x as usize, FloorKind::Box).unwrap();
-          loc = loc.step(backwards);
+      if let Some(mut moving) = self.plan_move(&self.guard, instruction) {
+        while let Some(from) = moving.pop() {
+          let old_floor = self.floor.get(from.y as usize, from.x as usize).unwrap();
+          let target = from.step(instruction);
+          *self.floor.get_mut(target.y as usize, target.x as usize).unwrap() = old_floor.clone();
+          *self.floor.get_mut(from.y as usize, from.x as usize).unwrap() = FloorKind::Empty;
         }
-        self.floor.set(loc.y as usize, loc.x as usize, FloorKind::Empty).unwrap();
+        self.guard = self.guard.step(instruction);
       }
     }
   }
@@ -116,7 +145,9 @@ impl Grid {
   fn compute_gps(&self) -> usize {
     self.floor.rows_iter().enumerate()
         .map(|(y, row_itr)| row_itr.enumerate()
-            .filter(|(_, val)| **val == FloorKind::Box).map(|(x, _)| y * 100 + x).sum::<usize>())
+            .filter(|(_, val)| val.is_box())
+            .map(|(x, _)| y * 100 + x)
+            .sum::<usize>())
         .sum()
   }
 
@@ -128,31 +159,59 @@ impl Grid {
           _ if self.guard.x == x as Position && self.guard.y == y as Position => { '@' },
           FloorKind::Wall => { '#' },
           FloorKind::Empty => { '.' },
-          FloorKind::Box => { 'O' },
+          FloorKind::Box(side) => match side {
+            Side::Both => 'O',
+            Side::Left => '[',
+            Side::Right => ']',
+          }
         };
         print!("{ch}");
       }
       println!();
     }
   }
+
+  fn double_width(&self) -> Self {
+    let mut floor = Array2D::filled_with(FloorKind::Empty, self.floor.num_rows(),
+    self.floor.num_columns() * 2);
+    for (y, row_iter) in self.floor.rows_iter().enumerate() {
+      for (x, spot) in row_iter.enumerate() {
+        match spot {
+          FloorKind::Wall => {
+            floor[(y, 2 * x)] = FloorKind::Wall;
+            floor[(y, 2 * x + 1)] = FloorKind::Wall;
+          },
+          FloorKind::Box(_) => {
+            floor[(y, 2 * x)] = FloorKind::Box(Side::Left);
+            floor[(y, 2 * x + 1)] = FloorKind::Box(Side::Right);
+          }
+          _ => {}
+        }
+      }
+    }
+    let guard = Coordinate{y: self.guard.y, x: self.guard.x * 2};
+    Grid{floor, guard}
+  }
 }
 
-pub fn generator(input: &str) -> Grid {
+pub fn generator(input: &str) -> Problem {
   let (grid_str, instructions) = input.split_once("\n\n").unwrap();
   let (floor, guard) = read_grid(grid_str).expect("Can't parse floor");
   let instructions = instructions.chars().filter(|ch| !ch.is_whitespace())
       .map(Direction::from_char).try_collect().expect("Can't parse instructions");
-  Grid{floor, guard, instructions}
+  Problem{ grid: Grid{floor, guard}, instructions}
 }
 
-pub fn part1(input: &Grid) -> usize {
-  let mut state = input.clone();
+pub fn part1(input: &Problem) -> usize {
+  let mut state = input.grid.clone();
   state.perform_commands(&input.instructions);
   state.compute_gps()
 }
 
-pub fn part2(_input: &Grid) -> usize {
-  0
+pub fn part2(input: &Problem) -> usize {
+  let mut state = input.grid.double_width();
+  state.perform_commands(&input.instructions);
+  state.compute_gps()
 }
 
 #[cfg(test)]
@@ -209,6 +268,6 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^";
   #[test]
   fn test_part2() {
     let data = generator(INPUT);
-    assert_eq!(999, part2(&data));
+    assert_eq!(9021, part2(&data));
   }
 }
