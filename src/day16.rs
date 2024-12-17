@@ -197,8 +197,8 @@ impl Grid {
   }
 }
 
-pub fn generator(input: &str) -> Grid {
-  Grid::from_str(input).expect("Can't parse input")
+pub fn generator(input: &str) -> Graph {
+  Graph::from_grid(&Grid::from_str(input).expect("Can't parse input"))
 }
 
 #[derive(Debug)]
@@ -314,13 +314,11 @@ fn min_cost(cost: &Array2D<Cost>, node: usize) -> Cost {
   *cost.row_iter(node).unwrap().min().unwrap()
 }
 
-pub fn part1(grid: &Grid) -> u64 {
-  let graph = Graph::from_grid(grid);
+pub fn part1(graph: &Graph) -> u64 {
   min_cost(&graph.minimum_cost(), Graph::END)
 }
 
-pub fn part2(grid: &Grid) -> u64 {
-  let graph = Graph::from_grid(grid);
+pub fn part2(graph: &Graph) -> u64 {
   let cost = graph.minimum_cost();
   let final_cost = min_cost(&cost, Graph::END);
   let mut pending = Vec::with_capacity(10);
