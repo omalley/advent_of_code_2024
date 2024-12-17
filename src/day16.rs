@@ -66,7 +66,7 @@ type NeighborList = SmallVec<[PositionedDirection; 4]>;
 type Cost = u64;
 
 #[derive(Clone,Debug,Eq,Ord,PartialEq,PartialOrd)]
-struct CostComponents {
+pub struct CostComponents {
   turns: u64,
   steps: u64,
 }
@@ -202,7 +202,7 @@ pub fn generator(input: &str) -> Grid {
 }
 
 #[derive(Debug)]
-struct Edge {
+pub struct Edge {
   start_direction: Direction,
   destination: usize,
   destination_direction: Direction,
@@ -212,7 +212,7 @@ struct Edge {
 type EdgeList = SmallVec<[Edge; 4]>;
 
 #[derive(Debug)]
-struct Graph {
+pub struct Graph {
   nodes: Vec<EdgeList>,
 }
 
@@ -257,7 +257,7 @@ impl Graph {
     }
   }
 
-  fn minimum_cost(&self) -> Cost {
+  fn minimum_cost(&self) -> Array2D<Cost> {
     let mut cost = Array2D::filled_with(Cost::MAX, self.nodes.len(), 4);
     let mut heap = BinaryHeap::new();
     cost[(Self::START, Direction::East as usize)] = 0;
@@ -281,7 +281,7 @@ impl Graph {
         }
       }
     }
-    *cost.row_iter(Graph::END).unwrap().min().unwrap()
+    cost
   }
 }
 
@@ -310,14 +310,57 @@ fn display_intersections(grid: &Grid) {
   }
 }
 
+fn min_cost(cost: &Array2D<Cost>, node: usize) -> Cost {
+  *cost.row_iter(node).unwrap().min().unwrap()
+}
+
 pub fn part1(grid: &Grid) -> u64 {
   let graph = Graph::from_grid(grid);
-  graph.minimum_cost()
+  min_cost(&graph.minimum_cost(), Graph::END)
 }
 
 pub fn part2(grid: &Grid) -> u64 {
   let graph = Graph::from_grid(grid);
-  0
+  let cost = graph.minimum_cost();
+  let final_cost = min_cost(&cost, Graph::END);
+  let mut pending = Vec::with_capacity(10);
+  let mut node_visited = vec![false; graph.nodes.len()];
+  let mut edge_visited = Array2D::filled_with(false, graph.nodes.len(), 4);
+  // set up initial state
+  let mut spaces = 1;
+  node_visited[Graph::END] = true;
+  for edge in &graph.nodes[Graph::END] {
+    if cost[(Graph::END, edge.start_direction.opposite() as usize)] == final_cost {
+      pending.push(WorkState{cost: final_cost - edge.cost.cost(),
+        node: edge.destination, direction: edge.destination_direction});
+      edge_visited[(edge.destination, edge.destination_direction as usize)] = true;
+      spaces += edge.cost.steps - 1;
+    }
+  };
+  // main loop
+  while let Some(current) = pending.pop() {
+    if !node_visited[current.node] {
+      spaces += 1;
+      node_visited[current.node] = true;
+    }
+
+    for edge in &graph.nodes[current.node] {
+      if !edge_visited[(edge.destination, edge.destination_direction as usize)] {
+        let mut goal_cost = current.cost;
+        if edge.start_direction != current.direction {
+          goal_cost -= CostComponents::TURN_COST;
+        }
+        if goal_cost == cost[(current.node, edge.start_direction.opposite() as usize)] &&
+            goal_cost >= edge.cost.cost() {
+          edge_visited[(edge.destination, edge.destination_direction as usize)] = true;
+          spaces += edge.cost.steps - 1;
+          pending.push(WorkState{cost: goal_cost - edge.cost.cost(), node: edge.destination,
+            direction: edge.destination_direction});
+        }
+      }
+    }
+  }
+  spaces
 }
 
 #[cfg(test)]
@@ -375,6 +418,12 @@ mod tests {
   #[test]
   fn test_part2() {
     let data = generator(INPUT);
-    assert_eq!(0, part2(&data));
+    assert_eq!(45, part2(&data));
+  }
+
+  #[test]
+  fn test_bigger_part2() {
+    let data = generator(BIGGER);
+    assert_eq!(64, part2(&data));
   }
 }
