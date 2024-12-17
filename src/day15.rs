@@ -16,10 +16,7 @@ pub enum FloorKind {
 impl FloorKind {
   /// Should this count a box for scoring?
   fn is_box(self) -> bool {
-    match self {
-      FloorKind::Box(Side::Both) | FloorKind::Box(Side::Left) => true,
-      _ => false,
-    }
+    matches!(self, FloorKind::Box(Side::Both) | FloorKind::Box(Side::Left))
   }
 }
 
@@ -134,7 +131,7 @@ impl Grid {
         while let Some(from) = moving.pop() {
           let old_floor = self.floor.get(from.y as usize, from.x as usize).unwrap();
           let target = from.step(instruction);
-          *self.floor.get_mut(target.y as usize, target.x as usize).unwrap() = old_floor.clone();
+          *self.floor.get_mut(target.y as usize, target.x as usize).unwrap() = *old_floor;
           *self.floor.get_mut(from.y as usize, from.x as usize).unwrap() = FloorKind::Empty;
         }
         self.guard = self.guard.step(instruction);
