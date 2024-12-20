@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use itertools::Itertools;
 
 type DataValue = u64;
@@ -14,6 +15,14 @@ pub struct State {
   registers: [DataValue; 3],
   pc: usize,
   output: Vec<u8>,
+}
+
+impl Display for State {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(f, "A: {:o}, B: {:o}, C: {:o}, PC: {:o}, Outputs: {:?}",
+           self.registers[RegisterName::A as usize], self.registers[RegisterName::B as usize],
+           self.registers[RegisterName::C as usize], self.pc, self.output)
+  }
 }
 
 #[derive(Clone,Copy,Debug)]
@@ -91,7 +100,7 @@ impl Instruction {
     match self.op {
       Operation::Adv(reg) => {
         state.registers[reg as usize] = state.registers[RegisterName::A as usize] >>
-            self.operand.evaluate(state).min(63);
+            self.operand.evaluate(state);
       }
       Operation::Xor(reg) => {
         state.registers[reg as usize] = state.registers[RegisterName::B as usize] ^
@@ -119,11 +128,11 @@ fn read_register(s: &str) -> Result<DataValue, String> {
   value.trim().parse().map_err(|_| format!("Can't parse register value {value}"))
 }
 
-pub fn generator(input: &str) -> (State, Program) {
+pub fn generator(input: &str) -> (State, Program, Vec<u8>) {
   let (registers, program) = input.split_once("\n\n")
       .expect("Can't find program");
   let values = registers.lines()
-      .map(|s| read_register(s))
+      .map(read_register)
       .collect::<Result<Vec<DataValue>, String>>()
       .expect("Can't parse values")
       .try_into().unwrap();
@@ -133,14 +142,14 @@ pub fn generator(input: &str) -> (State, Program) {
       .map_err(|_| format!("int parse error '{s}'"))).try_collect()
       .expect("Can't parse program");
   let mut program = Vec::new();
-  for bytes in &bytes.into_iter().chunks(2) {
-    program.push(Instruction::from_bytes(&bytes.collect::<Vec<u8>>())
+  for cmd_bytes in &bytes.iter().chunks(2) {
+    program.push(Instruction::from_bytes(&cmd_bytes.copied().collect::<Vec<u8>>())
         .expect("Can't parse instruction"));
   }
-  (state, program)
+  (state, program, bytes)
 }
 
-pub fn part1((state, program): &(State, Program)) -> String {
+pub fn part1((state, program, _): &(State, Program, Vec<u8>)) -> String {
   let mut state = state.clone();
   while state.pc < program.len() {
     program[state.pc].exuecute(&mut state);
@@ -148,11 +157,70 @@ pub fn part1((state, program): &(State, Program)) -> String {
   state.output.iter().join(",")
 }
 
-pub fn part2((_state, program): &(State, Program)) -> String {
-  for (pc, stmt) in program.iter().enumerate() {
-    println!("{pc}: {stmt:?}");
+#[derive(Clone,Copy,Debug,Eq,PartialEq)]
+enum TestResult {
+  Fail, Partial, Match(u64),
+}
+
+fn run_test(orig_state: &State, program: &Program, a: DataValue, required: usize,
+            goal: &[u8]) -> TestResult {
+  let mut state = orig_state.clone();
+  state.registers[RegisterName::A as usize] = a;
+  while state.pc < program.len() {
+    program[state.pc].exuecute(&mut state);
   }
-  String::new()
+  if state.output.len() < required || state.output.len() > goal.len() {
+    return TestResult::Fail;
+  }
+  for (i, g) in goal.iter().enumerate().filter(|(i, _)| *i < required) {
+    if state.output[i] != *g {
+      return TestResult::Fail;
+    }
+  }
+  if required == goal.len() {
+    TestResult::Match(a)
+  } else {
+    TestResult::Partial
+  }
+}
+
+fn next_digit(orig_state: &State, program: &Program, base: DataValue, required: usize,
+              goal: &[u8]) -> TestResult {
+  let mut results = Vec::new();
+  for digit in 0..8 {
+    let a = base + (digit << (3 * (2 + required)));
+    match run_test(orig_state, program, a, required, goal) {
+      TestResult::Fail => { continue },
+      TestResult::Partial => { },
+      TestResult::Match(a) => { results.push(a); continue },
+    }
+    if required == goal.len() {
+      return TestResult::Fail;
+    }
+    if let TestResult::Match(n) = next_digit(orig_state, program, a, required + 1, goal) {
+      results.push(n)
+    }
+  }
+  if results.is_empty() {
+    TestResult::Fail
+  } else {
+    TestResult::Match(*results.iter().min().unwrap())
+  }
+}
+
+pub fn part2((orig_state, program, bytes): &(State, Program, Vec<u8>)) -> DataValue {
+  let mut results = Vec::new();
+  for a in 0..(8u64.pow(4)) {
+    match run_test(orig_state, program, a, 1, bytes) {
+      TestResult::Fail => { continue },
+      TestResult::Partial => { },
+      TestResult::Match(a) => {  results.push(a); continue },
+    }
+    if let TestResult::Match(n) =  next_digit(orig_state, program, a, 2, bytes) {
+      results.push(n)
+    }
+  }
+  *results.iter().min().expect("No results")
 }
 
 #[cfg(test)]
@@ -172,9 +240,16 @@ Program: 0,1,5,4,3,0";
     assert_eq!("4,6,3,5,6,3,5,2,1,0", part1(&data));
   }
 
+  const PART2_INPUT: &str =
+  "Register A: 2024
+Register B: 0
+Register C: 0
+
+Program: 0,3,5,4,3,0";
+
   #[test]
   fn test_part2() {
-    let data = generator(INPUT);
-    assert_eq!("", part2(&data));
+    let data = generator(PART2_INPUT);
+    assert_eq!(117440, part2(&data));
   }
 }
