@@ -115,9 +115,11 @@ pub fn generator(input: &str) -> Grid {
 }
 
 fn cheat_distance(distances: &Array2D<usize>, p1: Coordinate, p2: Coordinate) -> usize {
+  // we need to discount the distance between the two points
+  let walk = p1.x.abs_diff(p2.x) as usize + p1.y.abs_diff(p2.y) as usize;
   match (distances[(p1.y as usize, p1.x as usize)], distances[(p2.y as usize, p2.x as usize)]) {
     (usize::MAX, _) | (_, usize::MAX) => 0,
-    (left, right) => left.abs_diff(right).max(2) - 2,
+    (left, right) => left.abs_diff(right).max(walk) - walk,
   }
 }
 
@@ -146,13 +148,40 @@ pub fn part1(input: &Grid) -> usize {
   do_part1(input, 100)
 }
 
-pub fn part2(_input: &Grid) -> usize {
-  0
+pub fn do_part2(input: &Grid, limit: usize, jump: usize) -> usize {
+  let distances = input.find_distances();
+  let mut count = 0;
+  let max = distances[(input.end.y as usize, input.end.x as usize)];
+  for (y, row) in distances.rows_iter().enumerate() {
+    for (x, dist) in row.enumerate() {
+      // ignore walls
+      if max >= *dist {
+        for y2 in y..(y + jump + 1).min(distances.row_len()) {
+          for x2 in (jump.max(x + y2 - y) - jump)..
+              (x + jump + y + 1 - y2).min(distances.column_len()) {
+            if y2 != y || x2 < x {
+              let cheat = cheat_distance(&distances, Coordinate::new(y, x),
+                                         Coordinate::new(y2, x2));
+              if  cheat >= limit {
+                count += 1;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  count
+}
+
+pub fn part2(input: &Grid) -> usize {
+  //slow_test(input, 100, 20)
+  do_part2(input, 100, 20)
 }
 
 #[cfg(test)]
 mod tests {
-  use super::{generator, do_part1, part2};
+  use super::{generator, do_part1, do_part2};
 
   const INPUT: &str =
 "###############
@@ -180,6 +209,6 @@ mod tests {
   #[test]
   fn test_part2() {
     let data = generator(INPUT);
-    assert_eq!(0, part2(&data));
+    assert_eq!(41, do_part2(&data, 70, 20));
   }
 }
