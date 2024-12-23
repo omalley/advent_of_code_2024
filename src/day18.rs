@@ -4,6 +4,7 @@ use std::ops::Range;
 use array2d::Array2D;
 use itertools::Itertools;
 use smallvec::SmallVec;
+use union_find::{QuickUnionUf, UnionByRank, UnionFind};
 
 type Position = i16;
 
@@ -95,17 +96,47 @@ fn print_distances(distances: &Array2D<usize>) {
   }
 }
 
+const FULL_SIZE: Position = 71;
+
 pub fn part1(input: &[Coordinate]) -> usize {
-  run_part1(&input[..1024], 0..71)
+  run_part1(&input[..1024], 0..FULL_SIZE)
 }
 
-pub fn part2(_input: &[Coordinate]) -> usize {
-  0
+pub fn run_part2(input: &[Coordinate], bounds: Range<Position>) -> String {
+  let mut block_time = Array2D::filled_with(None, bounds.len(), bounds.len());
+  let mut unionfind: QuickUnionUf<UnionByRank> = QuickUnionUf::new(2 + input.len());
+  for (round, current) in input.iter().enumerate() {
+    block_time[(current.y as usize, current.x as usize)] = Some(round + 2);
+    // Is it connected to the left/bottom?
+    if current.x == 0 || current.y == bounds.end - 1 {
+      unionfind.union(0, round + 2);
+    // Is it connected to the right/top?
+    } else if current.y == 0 || current.x == bounds.end - 1 {
+      unionfind.union(1, round + 2);
+    }
+    // connect us to each of the neighbors
+    for (dx, dy) in [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)] {
+      let (x, y) = (current.x + dx, current.y + dy);
+      if bounds.contains(&x) && bounds.contains(&y) {
+        if let Some(other) = block_time[(y as usize, x as usize)] {
+          unionfind.union(round + 2, other);
+        }
+      }
+    }
+    if unionfind.find(0) == unionfind.find(1) {
+      return format!("{},{}", current.x, current.y);
+    }
+  }
+  "None".to_string()
+}
+
+pub fn part2(input: &[Coordinate]) -> String {
+  run_part2(input, 0..FULL_SIZE)
 }
 
 #[cfg(test)]
 mod tests {
-  use super::{generator, run_part1, part2};
+  use super::{generator, run_part1, run_part2};
 
   const INPUT: &str =
 "5,4
@@ -143,6 +174,6 @@ mod tests {
   #[test]
   fn test_part2() {
     let data = generator(INPUT);
-    assert_eq!(0, part2(&data));
+    assert_eq!("6,1", run_part2(&data, 0..7));
   }
 }
