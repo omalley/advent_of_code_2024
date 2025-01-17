@@ -346,6 +346,9 @@ pub fn part2(graph: &Graph) -> u64 {
       if !edge_visited[(edge.destination, edge.destination_direction as usize)] {
         let mut goal_cost = current.cost;
         if edge.start_direction != current.direction {
+          if goal_cost < CostComponents::TURN_COST {
+            continue;
+          }
           goal_cost -= CostComponents::TURN_COST;
         }
         if goal_cost == cost[(current.node, edge.start_direction.opposite() as usize)] &&
