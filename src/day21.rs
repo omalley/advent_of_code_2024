@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+use std::iter;
 use itertools::Itertools;
 use smallvec::SmallVec;
 
@@ -7,6 +9,14 @@ type Position = i8;
 struct Coordinate {
   x: Position,
   y: Position,
+}
+
+trait KeyPad: Sized {
+  /// Find the button at the given coordinate.
+  fn from_position(coordinate: Coordinate) -> Option<Self>;
+
+  /// Find the position of the given button.
+  fn position(&self) -> Coordinate;
 }
 
 #[derive(Clone,Copy,Debug,Eq,PartialEq)]
@@ -32,51 +42,6 @@ impl TenKey {
       '0' => Ok(TenKey::Zero),
       'A' => Ok(TenKey::Activate),
       _ => Err(format!("Invalid TenKey char '{}'", ch)),
-    }
-  }
-
-  fn position(&self) -> Coordinate {
-    match self {
-      TenKey::Seven => Coordinate{x: 2, y: 3},
-      TenKey::Eight => Coordinate{x: 1, y: 3},
-      TenKey::Nine => Coordinate{x: 0, y: 3},
-      TenKey::Four => Coordinate{x: 2, y: 2},
-      TenKey::Five => Coordinate{x: 1, y: 2},
-      TenKey::Six => Coordinate{x: 0, y: 2},
-      TenKey::One => Coordinate{x: 2, y: 1},
-      TenKey::Two => Coordinate{x: 1, y: 1},
-      TenKey::Three => Coordinate{x: 0, y: 1},
-      TenKey::Zero => Coordinate{x: 1, y: 0},
-      TenKey::Activate => Coordinate{x: 0, y: 0},
-    }
-  }
-
-  fn from_position(coordinate: Coordinate) -> Option<TenKey> {
-    match coordinate.y {
-      0 => match coordinate.x {
-        0 => Some(TenKey::Activate),
-        1 => Some(TenKey::Zero),
-        _ => None,
-      },
-      1 => match coordinate.x {
-        0 => Some(TenKey::Three),
-        1 => Some(TenKey::Two),
-        2 => Some(TenKey::One),
-        _ => None,
-      },
-      2 => match coordinate.x {
-        0 => Some(TenKey::Six),
-        1 => Some(TenKey::Five),
-        2 => Some(TenKey::Four),
-        _ => None,
-      },
-      3 => match coordinate.x {
-        0 => Some(TenKey::Nine),
-        1 => Some(TenKey::Eight),
-        2 => Some(TenKey::Seven),
-        _ => None,
-      },
-      _ => None,
     }
   }
 
@@ -113,6 +78,53 @@ impl TenKey {
   }
 }
 
+impl KeyPad for TenKey {
+  fn from_position(coordinate: Coordinate) -> Option<TenKey> {
+    match coordinate.y {
+      0 => match coordinate.x {
+        0 => Some(TenKey::Activate),
+        1 => Some(TenKey::Zero),
+        _ => None,
+      },
+      1 => match coordinate.x {
+        0 => Some(TenKey::Three),
+        1 => Some(TenKey::Two),
+        2 => Some(TenKey::One),
+        _ => None,
+      },
+      2 => match coordinate.x {
+        0 => Some(TenKey::Six),
+        1 => Some(TenKey::Five),
+        2 => Some(TenKey::Four),
+        _ => None,
+      },
+      3 => match coordinate.x {
+        0 => Some(TenKey::Nine),
+        1 => Some(TenKey::Eight),
+        2 => Some(TenKey::Seven),
+        _ => None,
+      },
+      _ => None,
+    }
+  }
+
+  fn position(&self) -> Coordinate {
+    match self {
+      TenKey::Seven => Coordinate{x: 2, y: 3},
+      TenKey::Eight => Coordinate{x: 1, y: 3},
+      TenKey::Nine => Coordinate{x: 0, y: 3},
+      TenKey::Four => Coordinate{x: 2, y: 2},
+      TenKey::Five => Coordinate{x: 1, y: 2},
+      TenKey::Six => Coordinate{x: 0, y: 2},
+      TenKey::One => Coordinate{x: 2, y: 1},
+      TenKey::Two => Coordinate{x: 1, y: 1},
+      TenKey::Three => Coordinate{x: 0, y: 1},
+      TenKey::Zero => Coordinate{x: 1, y: 0},
+      TenKey::Activate => Coordinate{x: 0, y: 0},
+    }
+  }
+}
+
 type Sequence = SmallVec<[TenKey; 10]>;
 
 #[derive(Clone,Copy,Debug,Eq,PartialEq)]
@@ -132,17 +144,28 @@ impl ArrowKey {
     }
   }
 
-  fn position(&self) -> Coordinate {
-    match self {
-      ArrowKey::Up => Coordinate { x: 1, y: 1 },
-      ArrowKey::Activate => Coordinate { x: 0, y: 1 },
-      ArrowKey::Left => Coordinate { x: 2, y: 0 },
-      ArrowKey::Down => Coordinate { x: 1, y: 0 },
-      ArrowKey::Right => Coordinate { x: 0, y: 0 },
+  /// Which vertical direction do we move to get from current to goal?
+  fn vertical_move(current: Position, goal: Position) -> Option<Self> {
+    match current.cmp(&goal) {
+      Ordering::Less => Some(ArrowKey::Up),
+      Ordering::Equal => None,
+      Ordering::Greater => Some(ArrowKey::Down),
     }
   }
 
-  fn from_position(coordinate: Coordinate) -> Option<ArrowKey> {
+  /// Which horizontal direction do we move to get from current to goal?
+  fn horizontal_move(current: Position, goal: Position) -> Option<Self> {
+    match current.cmp(&goal) {
+      Ordering::Less => Some(ArrowKey::Left),
+      Ordering::Equal => None,
+      Ordering::Greater => Some(ArrowKey::Right),
+    }
+  }
+}
+
+
+impl KeyPad for ArrowKey {
+  fn from_position(coordinate: Coordinate) -> Option<Self> {
     match coordinate.y {
       0 => match coordinate.x {
         0 => Some(ArrowKey::Right),
@@ -159,13 +182,13 @@ impl ArrowKey {
     }
   }
 
-  fn move_in(&self, coordinate: Coordinate) -> Option<Coordinate> {
+  fn position(&self) -> Coordinate {
     match self {
-      ArrowKey::Up => Some(Coordinate{x: coordinate.x, y: coordinate.y + 1}),
-      ArrowKey::Down => Some(Coordinate{x: coordinate.x, y: coordinate.y - 1}),
-      ArrowKey::Left => Some(Coordinate{x: coordinate.x + 1, y: coordinate.y}),
-      ArrowKey::Right => Some(Coordinate{x: coordinate.x - 1, y: coordinate.y}),
-      _ => None,
+      ArrowKey::Up => Coordinate { x: 1, y: 1 },
+      ArrowKey::Activate => Coordinate { x: 0, y: 1 },
+      ArrowKey::Left => Coordinate { x: 2, y: 0 },
+      ArrowKey::Down => Coordinate { x: 1, y: 0 },
+      ArrowKey::Right => Coordinate { x: 0, y: 0 },
     }
   }
 }
@@ -178,12 +201,44 @@ pub fn generator(input: &str) -> Vec<Sequence> {
   input.lines().map(parse_line).try_collect().expect("Can't parse input")
 }
 
-struct TenKeyNeighbor {
-  next: TenKey,
-  direction: ArrowKey,
+/// Return the possibilities for pressing the given key.
+/// Only the paths along direct routes are included.
+fn plan_paths<T: KeyPad>(curr_key: T, goal_key: T) -> Vec<Vec<ArrowKey>> {
+  let current = curr_key.position();
+  let goal = goal_key.position();
+  let mut result = Vec::new();
+  // Go horizontal and then vertical.
+  if let Some(dir) = ArrowKey::horizontal_move(current.x, goal.x) {
+    // Only include the path if it avoids the missing key.
+    if current.y == goal.y ||
+        T::from_position(Coordinate{x: goal.x, y: current.y}).is_some() {
+      let mut path = vec![dir; current.x.abs_diff(goal.x) as usize];
+      if let Some(dir) = ArrowKey::vertical_move(current.y, goal.y) {
+        path.extend(iter::once(dir).cycle().take(current.y.abs_diff(goal.y) as usize));
+      }
+      path.push(ArrowKey::Activate);
+      result.push(path);
+    }
+  }
+  // Go vertical first and then horizontal.
+  if let Some(dir) = ArrowKey::vertical_move(current.y, goal.y) {
+    // Only include the path if it avoids the missing key.
+    if current.x == goal.x ||
+        T::from_position(Coordinate{x: current.x, y: goal.y}).is_some() {
+      let mut path = vec![dir; current.y.abs_diff(goal.y) as usize];
+      if let Some(dir) = ArrowKey::horizontal_move(current.x, goal.x) {
+        path.extend(iter::once(dir).cycle().take(current.x.abs_diff(goal.x) as usize));
+      }
+      path.push(ArrowKey::Activate);
+      result.push(path);
+    }
+  }
+  result
 }
 
-type TenKeyNeighbors = Vec<TenKeyNeighbor>;
+trait PadState {
+  fn move_to(&self, goal: TenKey) -> Vec<Vec<ArrowKey>>;
+}
 
 struct TenKeyHand {
   current: TenKey,
@@ -193,50 +248,31 @@ impl TenKeyHand {
   fn new() -> Self {
     Self { current: TenKey::Activate }
   }
+}
 
-  fn neighbors(&self, coordinate: Coordinate) -> TenKeyNeighbors {
-    [ArrowKey::Up, ArrowKey::Right, ArrowKey::Down, ArrowKey::Left].iter()
-        .filter_map(|key| key.move_in(coordinate)
-            .and_then(|c| TenKey::from_position(c))
-            .and_then(|tk| Some(TenKeyNeighbor{next: tk, direction: *key})))
-        .collect()
-  }
-
-  /// Return the possibilities for pressing the given key.
-  /// Only the path along direct routes are included.
-  fn plan_press(&mut self, key: TenKey) -> Vec<Vec<ArrowKey>> {
-    let current = self.current.position();
-    let goal = key.position();
-    let mut result = Vec::new();
-    if current.x != goal.x &&
-        TenKey::from_position(Coordinate{x: goal.x, y: current.y}).is_some() {
-      let dir = if current.x < goal.x { ArrowKey::Right } else { ArrowKey::Left };
-      let mut path = vec![dir; current.x.abs_diff(goal.x) as usize];
-      let dir = if current.y < goal.y { ArrowKey::Down } else { ArrowKey::Up };
-      path.append(&mut vec![dir; current.y.abs_diff(goal.y) as usize]);
-      path.push(ArrowKey::Activate);
-      result.push(path);
-    }
-    if current.y != goal.y &&
-        TenKey::from_position(Coordinate{x: current.x, y: goal.y}).is_some() {
-      let dir = if current.y < goal.y { ArrowKey::Up } else { ArrowKey::Down };
-      let mut path = vec![dir; current.y.abs_diff(goal.y) as usize];
-      let dir = if current.x < goal.x { ArrowKey::Right } else { ArrowKey::Left };
-      path.append(&mut vec![dir; current.x.abs_diff(goal.x) as usize]);
-      path.push(ArrowKey::Activate);
-      result.push(path);
-    }
-    result
+impl PadState for TenKeyHand {
+  fn move_to(&self, goal: TenKey) -> Vec<Vec<ArrowKey>> {
+    plan_paths(self.current, goal)
   }
 }
 
-struct ArrowHand {
+struct ArrowHand<T: PadState> {
+  upstream: T,
   current: ArrowKey,
 }
 
-impl ArrowHand {
-  fn new() -> Self {
-    Self { current: ArrowKey::Activate }
+impl<T: PadState> ArrowHand<T> {
+  fn new(upstream: T) -> Self {
+    Self { upstream, current: ArrowKey::Activate }
+  }
+}
+
+impl<T: PadState> PadState for ArrowHand<T> {
+  fn move_to(&self, goal: TenKey) -> Vec<Vec<ArrowKey>> {
+   // self.upstream.move_to(goal).into_iter()
+   //     .flat_map(|vec| vec.into_iter().map(|k| ))
+   //     .collect()
+    vec![]
   }
 }
 
